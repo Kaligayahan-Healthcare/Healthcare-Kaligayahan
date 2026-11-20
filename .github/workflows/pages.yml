@@ -1,0 +1,48 @@
+# Publishes the public website (the website/ folder) on GitHub Pages at the repository's main
+# address. The staff portal, the server code and the guides are NOT published.
+# One-time setting: repository Settings -> Pages -> Source: "GitHub Actions".
+name: Publish website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Public site only (no staff portal, no server code)
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          mkdir _site
+          cp -r website/. _site/
+          rm -f _site/staff.html
+          # the "page not found" page is shown at any address, so its links need the full path
+          sed -i "s|href=\"/favicon.png\"|href=\"/$REPO/favicon.png\"|; s|href=\"/fonts/fonts.css\"|href=\"/$REPO/fonts/fonts.css\"|; s|href=\"/styles.css\"|href=\"/$REPO/styles.css\"|; s|href=\"/\"|href=\"/$REPO/\"|" _site/404.html
+          touch _site/.nojekyll
+          ls -la _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
