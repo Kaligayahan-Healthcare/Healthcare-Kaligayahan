@@ -1,6 +1,7 @@
-# Publishes the public website (the website/ folder) on GitHub Pages at the repository's main
-# address. The staff portal, the server code and the guides are NOT published.
-# One-time setting: repository Settings -> Pages -> Source: "GitHub Actions".
+# Publishes the public website (the website/ folder) on GitHub Pages, at
+# https://<account>.github.io/<repository>/ , by updating the "gh-pages" branch.
+# The staff portal, the server code and the guides are NOT published.
+# No repository setting is needed: GitHub serves the gh-pages branch automatically.
 name: Publish website
 
 on:
@@ -9,9 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -20,13 +19,10 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Public site only (no staff portal, no server code)
+      - name: Build the public site (no staff portal, no server code)
         env:
           REPO: ${{ github.event.repository.name }}
         run: |
@@ -36,13 +32,13 @@ jobs:
           # the "page not found" page is shown at any address, so its links need the full path
           sed -i "s|href=\"/favicon.png\"|href=\"/$REPO/favicon.png\"|; s|href=\"/fonts/fonts.css\"|href=\"/$REPO/fonts/fonts.css\"|; s|href=\"/styles.css\"|href=\"/$REPO/styles.css\"|; s|href=\"/\"|href=\"/$REPO/\"|" _site/404.html
           touch _site/.nojekyll
-          ls -la _site
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Update the gh-pages branch
+        run: |
+          cd _site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish website from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
